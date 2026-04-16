@@ -1,19 +1,269 @@
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    ImageBackground,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  ImageBackground,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import { requireCurrentUserId } from "../lib/currentUser";
+import { supabase } from "../lib/supabase";
+
+type EventItem = {
+  id: string;
+  title: string;
+  date_label: string;
+  location: string;
+  interested: number;
+  category: string;
+  image: string;
+  featured?: boolean;
+  created_at?: string;
+};
+
+type InterestRow = {
+  status: "interested" | "going";
+};
 
 export default function EventDetailsScreen() {
+  const params = useLocalSearchParams<{ eventId?: string }>();
+  const eventId = params.eventId ?? "";
+
+  const [event, setEvent] = useState<EventItem | null>(null);
   const [interested, setInterested] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [going, setGoing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!eventId) {
+      setLoading(false);
+      return;
+    }
+
+    loadEventData();
+  }, [eventId]);
+
+  const loadEventData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([fetchEvent(), loadEventState()]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong loading this event.";
+      Alert.alert("Event error", message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEvent = async () => {
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .eq("id", eventId)
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    setEvent(data as EventItem);
+  };
+
+  const loadEventState = async () => {
+    const userId = await requireCurrentUserId();
+
+    const { data: savedData, error: savedError } = await supabase
+      .from("saved_events")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("event_id", eventId);
+
+    if (savedError) {
+      throw new Error(savedError.message);
+    }
+
+    setSaved((savedData?.length ?? 0) > 0);
+
+    const { data: interestData, error: interestError } = await supabase
+      .from("event_interests")
+      .select("status")
+      .eq("user_id", userId)
+      .eq("event_id", eventId);
+
+    if (interestError) {
+      throw new Error(interestError.message);
+    }
+
+    const statuses = ((interestData as InterestRow[]) || []).map((row) => row.status);
+    setInterested(statuses.includes("interested"));
+    setGoing(statuses.includes("going"));
+  };
+
+  const toggleSave = async () => {
+    if (!eventId) return;
+
+    try {
+      const userId = await requireCurrentUserId();
+
+      if (saved) {
+        const { error } = await supabase
+          .from("saved_events")
+          .delete()
+          .eq("user_id", userId)
+          .eq("event_id", eventId);
+
+        if (error) {
+          Alert.alert("Could not unsave event", error.message);
+          return;
+        }
+
+        setSaved(false);
+        return;
+      }
+
+      const { error } = await supabase.from("saved_events").insert([
+        {
+          user_id: userId,
+          event_id: eventId,
+        },
+      ]);
+
+      if (error) {
+        Alert.alert("Could not save event", error.message);
+        return;
+      }
+
+      setSaved(true);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong saving this event.";
+      Alert.alert("Save error", message);
+    }
+  };
+
+  const toggleInterested = async () => {
+    if (!eventId) return;
+
+    try {
+      const userId = await requireCurrentUserId();
+
+      if (interested) {
+        const { error } = await supabase
+          .from("event_interests")
+          .delete()
+          .eq("user_id", userId)
+          .eq("event_id", eventId)
+          .eq("status", "interested");
+
+        if (error) {
+          Alert.alert("Could not remove interest", error.message);
+          return;
+        }
+
+        setInterested(false);
+        return;
+      }
+
+      const { error } = await supabase.from("event_interests").insert([
+        {
+          user_id: userId,
+          event_id: eventId,
+          status: "interested",
+        },
+      ]);
+
+      if (error) {
+        Alert.alert("Could not mark interested", error.message);
+        return;
+      }
+
+      setInterested(true);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong updating interest.";
+      Alert.alert("Interest error", message);
+    }
+  };
+
+  const toggleGoing = async () => {
+    if (!eventId) return;
+
+    try {
+      const userId = await requireCurrentUserId();
+
+      if (going) {
+        const { error } = await supabase
+          .from("event_interests")
+          .delete()
+          .eq("user_id", userId)
+          .eq("event_id", eventId)
+          .eq("status", "going");
+
+        if (error) {
+          Alert.alert("Could not remove going status", error.message);
+          return;
+        }
+
+        setGoing(false);
+        return;
+      }
+
+      const { error } = await supabase.from("event_interests").insert([
+        {
+          user_id: userId,
+          event_id: eventId,
+          status: "going",
+        },
+      ]);
+
+      if (error) {
+        Alert.alert("Could not mark going", error.message);
+        return;
+      }
+
+      setGoing(true);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong updating going status.";
+      Alert.alert("Going error", message);
+    }
+  };
+
+  if (!eventId) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={[styles.container, styles.centered]}>
+          <Text style={styles.loadingText}>No event selected.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={[styles.container, styles.centered]}>
+          <Text style={styles.loadingText}>Loading event...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!event) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={[styles.container, styles.centered]}>
+          <Text style={styles.loadingText}>Event not found.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -23,9 +273,7 @@ export default function EventDetailsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <ImageBackground
-          source={{
-            uri: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80",
-          }}
+          source={{ uri: event.image }}
           style={styles.heroImage}
           imageStyle={styles.heroImageStyle}
         >
@@ -46,50 +294,54 @@ export default function EventDetailsScreen() {
 
           <View style={styles.heroBottom}>
             <View style={styles.liveBadge}>
-              <Text style={styles.liveBadgeText}>🔥 Tonight’s Highlight</Text>
+              <Text style={styles.liveBadgeText}>
+                {event.featured ? "🔥 Tonight’s Highlight" : "🎉 Event"}
+              </Text>
             </View>
 
-            <Text style={styles.eventTitle}>Neon Nights DJ Pulse</Text>
-            <Text style={styles.eventSubtitle}>Downtown Bakersfield • Tonight • 10:00 PM</Text>
+            <Text style={styles.eventTitle}>{event.title}</Text>
+            <Text style={styles.eventSubtitle}>
+              {event.location} • {event.date_label}
+            </Text>
           </View>
         </ImageBackground>
 
         <View style={styles.contentCard}>
           <View style={styles.infoGrid}>
             <View style={styles.infoBox}>
-              <Text style={styles.infoLabel}>Date</Text>
-              <Text style={styles.infoValue}>Friday, April 25</Text>
+              <Text style={styles.infoLabel}>Date & Time</Text>
+              <Text style={styles.infoValue}>{event.date_label}</Text>
             </View>
 
             <View style={styles.infoBox}>
-              <Text style={styles.infoLabel}>Time</Text>
-              <Text style={styles.infoValue}>10:00 PM</Text>
+              <Text style={styles.infoLabel}>Category</Text>
+              <Text style={styles.infoValue}>{event.category}</Text>
             </View>
 
             <View style={styles.infoBox}>
               <Text style={styles.infoLabel}>Venue</Text>
-              <Text style={styles.infoValue}>The Echo Lounge</Text>
+              <Text style={styles.infoValue}>{event.location}</Text>
             </View>
 
             <View style={styles.infoBox}>
               <Text style={styles.infoLabel}>Interested</Text>
-              <Text style={styles.infoValue}>124 People</Text>
+              <Text style={styles.infoValue}>{event.interested} People</Text>
             </View>
           </View>
 
           <View style={styles.organizerCard}>
             <View style={styles.organizerAvatar}>
-              <Text style={styles.organizerAvatarText}>NP</Text>
+              <Text style={styles.organizerAvatarText}>HV</Text>
             </View>
 
             <View style={styles.organizerTextWrap}>
-              <Text style={styles.organizerName}>Neon Pulse Events</Text>
-              <Text style={styles.organizerMeta}>Organizer • 18 events hosted</Text>
+              <Text style={styles.organizerName}>Hive Organizer</Text>
+              <Text style={styles.organizerMeta}>Organizer • Local events</Text>
             </View>
 
             <Pressable
               style={styles.followButton}
-              onPress={() => Alert.alert("Followed", "Organizer follow comes tomorrow")}
+              onPress={() => Alert.alert("Followed", "Organizer follow comes later")}
             >
               <Text style={styles.followButtonText}>Follow</Text>
             </Pressable>
@@ -98,9 +350,9 @@ export default function EventDetailsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About this event</Text>
             <Text style={styles.description}>
-              Step into a late-night club experience with live DJs, neon lighting, packed dance
-              floors, and a full weekend crowd. This event is built for people looking for a real
-              night out in Bakersfield with music, energy, and a social atmosphere.
+              This event is live in your Hive feed. Later, this section can hold the real event
+              description written by the organizer. For now, you’ve got full backend actions wired
+              to this event.
             </Text>
           </View>
 
@@ -109,22 +361,22 @@ export default function EventDetailsScreen() {
 
             <View style={styles.tagRow}>
               <View style={styles.tag}>
-                <Text style={styles.tagText}>🎧 Live DJ</Text>
+                <Text style={styles.tagText}>🎟️ Live Event</Text>
               </View>
               <View style={styles.tag}>
-                <Text style={styles.tagText}>🍸 Drinks</Text>
+                <Text style={styles.tagText}>📍 Local</Text>
               </View>
               <View style={styles.tag}>
-                <Text style={styles.tagText}>💃 Dance Floor</Text>
+                <Text style={styles.tagText}>🔥 Popular</Text>
               </View>
             </View>
 
             <View style={styles.tagRow}>
               <View style={styles.tag}>
-                <Text style={styles.tagText}>🌃 Nightlife</Text>
+                <Text style={styles.tagText}>🎉 Social</Text>
               </View>
               <View style={styles.tag}>
-                <Text style={styles.tagText}>📍 Downtown</Text>
+                <Text style={styles.tagText}>📱 On Hive</Text>
               </View>
             </View>
           </View>
@@ -132,8 +384,8 @@ export default function EventDetailsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Location</Text>
             <View style={styles.locationCard}>
-              <Text style={styles.locationTitle}>The Echo Lounge</Text>
-              <Text style={styles.locationText}>1821 N Street, Bakersfield, CA</Text>
+              <Text style={styles.locationTitle}>{event.location}</Text>
+              <Text style={styles.locationText}>Full address support comes later.</Text>
             </View>
           </View>
         </View>
@@ -142,7 +394,7 @@ export default function EventDetailsScreen() {
       <View style={styles.bottomBar}>
         <Pressable
           style={[styles.secondaryAction, interested && styles.secondaryActionActive]}
-          onPress={() => setInterested((prev) => !prev)}
+          onPress={toggleInterested}
         >
           <Text style={styles.secondaryActionText}>
             {interested ? "Interested ✓" : "Interested"}
@@ -151,16 +403,16 @@ export default function EventDetailsScreen() {
 
         <Pressable
           style={[styles.iconAction, saved && styles.iconActionActive]}
-          onPress={() => setSaved((prev) => !prev)}
+          onPress={toggleSave}
         >
           <Text style={styles.iconActionText}>{saved ? "🔖" : "📑"}</Text>
         </Pressable>
 
         <Pressable
-          style={styles.primaryAction}
-          onPress={() => Alert.alert("Tickets", "External ticket link tomorrow")}
+          style={[styles.primaryAction, going && styles.primaryActionActive]}
+          onPress={toggleGoing}
         >
-          <Text style={styles.primaryActionText}>Get Tickets</Text>
+          <Text style={styles.primaryActionText}>{going ? "Going ✓" : "Going"}</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -175,6 +427,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#050816",
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "700",
   },
   contentContainer: {
     paddingBottom: 120,
@@ -432,10 +693,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  primaryActionActive: {
+    backgroundColor: "#3E50F0",
+  },
   primaryActionText: {
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "800",
   },
 });
- 

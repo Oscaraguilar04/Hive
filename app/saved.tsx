@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ImageBackground,
   Pressable,
@@ -8,57 +8,124 @@ import {
   Text,
   View,
 } from "react-native";
+import { supabase } from "../lib/supabase";
+import { requireCurrentUserId } from "../lib/currentUser";
 
 type TabType = "Going" | "Saved";
 
-const goingEvents = [
-  {
-    id: "1",
-    title: "Neon Nights DJ Pulse",
-    time: "Tonight • 10:00 PM",
-    location: "The Echo Lounge",
-    image:
-      "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "2",
-    title: "Sunset Rooftop Session",
-    time: "Sat • 8:30 PM",
-    location: "Skyline Rooftop",
-    image:
-      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80",
-  },
-];
+type EventRow = {
+  id: string;
+  title: string;
+  date_label: string;
+  location: string;
+  image: string;
+};
 
-const savedEvents = [
-  {
-    id: "3",
-    title: "Taco & Beer Fest",
-    time: "Sat • 6:00 PM",
-    location: "Downtown Lot",
-    image:
-      "https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "4",
-    title: "Saturday Night Laughs",
-    time: "Sat • 8:00 PM",
-    location: "Comedy Den",
-    image:
-      "https://images.unsplash.com/photo-1527224857830-43a7acc85260?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "5",
-    title: "Local Artist Pop-Up",
-    time: "Sun • 12:00 PM",
-    location: "Art Square",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=1200&q=80",
-  },
-];
+type SavedJoinRow = {
+  id: string;
+  event_id: string;
+  events: EventRow | EventRow[] | null;
+};
+
+type InterestJoinRow = {
+  id: string;
+  event_id: string;
+  status: "interested" | "going";
+  events: EventRow | EventRow[] | null;
+};
 
 export default function SavedScreen() {
   const [activeTab, setActiveTab] = useState<TabType>("Going");
+  const [goingEvents, setGoingEvents] = useState<EventRow[]>([]);
+  const [savedEvents, setSavedEvents] = useState<EventRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadSavedScreenData();
+  }, []);
+
+  const normalizeEvent = (value: EventRow | EventRow[] | null): EventRow | null => {
+    if (!value) return null;
+    if (Array.isArray(value)) return value[0] ?? null;
+    return value;
+  };
+
+  const loadSavedScreenData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([fetchGoingEvents(), fetchSavedEvents()]);
+    } catch (error) {
+      console.error("Error loading saved screen data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchGoingEvents = async () => {
+    const userId = await requireCurrentUserId();
+
+    const { data, error } = await supabase
+      .from("event_interests")
+      .select(
+        `
+        id,
+        event_id,
+        status,
+        events (
+          id,
+          title,
+          date_label,
+          location,
+          image
+        )
+      `
+      )
+      .eq("user_id", userId)
+      .eq("status", "going");
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const rows = (data as InterestJoinRow[]) || [];
+    const normalized = rows
+      .map((row) => normalizeEvent(row.events))
+      .filter((event): event is EventRow => Boolean(event));
+
+    setGoingEvents(normalized);
+  };
+
+  const fetchSavedEvents = async () => {
+    const userId = await requireCurrentUserId();
+
+    const { data, error } = await supabase
+      .from("saved_events")
+      .select(
+        `
+        id,
+        event_id,
+        events (
+          id,
+          title,
+          date_label,
+          location,
+          image
+        )
+      `
+      )
+      .eq("user_id", userId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const rows = (data as SavedJoinRow[]) || [];
+    const normalized = rows
+      .map((row) => normalizeEvent(row.events))
+      .filter((event): event is EventRow => Boolean(event));
+
+    setSavedEvents(normalized);
+  };
 
   const currentList = activeTab === "Going" ? goingEvents : savedEvents;
 
@@ -98,8 +165,23 @@ export default function SavedScreen() {
           <Text style={styles.sectionTitle}>
             {activeTab === "Going" ? "🔥 Going Soon" : "⭐ Saved for Later"}
           </Text>
-          <Text style={styles.sectionCount}>{currentList.length} events</Text>
+          <Text style={styles.sectionCount}>
+            {loading ? "Loading..." : `${currentList.length} events`}
+          </Text>
         </View>
+
+        {!loading && currentList.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>
+              {activeTab === "Going" ? "No going events yet" : "No saved events yet"}
+            </Text>
+            <Text style={styles.emptyText}>
+              {activeTab === "Going"
+                ? "Mark an event as going and it will appear here."
+                : "Save an event from Home and it will appear here."}
+            </Text>
+          </View>
+        ) : null}
 
         {currentList.map((event) => (
           <Pressable key={event.id} style={styles.eventCard}>
@@ -114,7 +196,7 @@ export default function SavedScreen() {
             <View style={styles.eventBody}>
               <View style={styles.eventTextWrap}>
                 <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.eventMeta}>{event.time}</Text>
+                <Text style={styles.eventMeta}>{event.date_label}</Text>
                 <Text style={styles.eventLocation}>{event.location}</Text>
               </View>
 
@@ -207,6 +289,25 @@ const styles = StyleSheet.create({
     color: "#8F99BE",
     fontSize: 14,
     fontWeight: "700",
+  },
+  emptyState: {
+    backgroundColor: "#0B1124",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#18213F",
+    padding: 18,
+    marginBottom: 14,
+  },
+  emptyTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  emptyText: {
+    color: "#98A2C7",
+    fontSize: 14,
+    lineHeight: 22,
   },
   eventCard: {
     backgroundColor: "#0B1124",

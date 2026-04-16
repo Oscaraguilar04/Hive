@@ -1,24 +1,52 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import type { Session } from "@supabase/supabase-js";
+import { Stack, useRouter, useSegments } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+export default function Layout() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+  const router = useRouter();
+  const segments = useSegments();
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    const loadSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+      setSession(session);
+      setLoading(false);
+    };
+
+    loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const inAuthScreen = (segments as string[]).includes("login");
+
+    if (!session && !inAuthScreen) {
+      router.replace("/login" as any);
+      return;
+    }
+
+    if (session && inAuthScreen) {
+      router.replace("/" as any);
+    }
+  }, [session, loading, segments, router]);
+
+  return <Stack screenOptions={{ headerShown: false }} />;
 }

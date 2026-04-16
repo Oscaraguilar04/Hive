@@ -1,34 +1,82 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
-    ImageBackground,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  ImageBackground,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import { router } from "expo-router";
+import { supabase } from "../lib/supabase";
+import { signOutUser } from "../lib/auth";
+import { requireCurrentUserId } from "../lib/currentUser";
 
-const myEvents = [
-  {
-    id: "1",
-    title: "Neon Nights DJ Pulse",
-    time: "Fri • 10:00 PM",
-    location: "The Echo Lounge",
-    image:
-      "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "2",
-    title: "Sunset Rooftop Session",
-    time: "Sat • 8:30 PM",
-    location: "Skyline Rooftop",
-    image:
-      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80",
-  },
-];
+type EventRow = {
+  id: string;
+  title: string;
+  date_label: string;
+  location: string;
+  image: string;
+  creator_id?: string | null;
+};
 
 export default function ProfileScreen() {
+  const [email, setEmail] = useState("");
+  const [myEvents, setMyEvents] = useState<EventRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user?.email) {
+        setEmail(user.email);
+      }
+
+      const userId = await requireCurrentUserId();
+
+      const { data, error } = await supabase
+        .from("events")
+        .select("id, title, date_label, location, image, creator_id")
+        .eq("creator_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setMyEvents((data as EventRow[]) || []);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong loading profile.";
+      Alert.alert("Profile error", message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    const { error } = await signOutUser();
+
+    if (error) {
+      Alert.alert("Logout error", error.message);
+      return;
+    }
+
+    router.replace("/login");
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -38,48 +86,57 @@ export default function ProfileScreen() {
       >
         <View style={styles.headerCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>L</Text>
+            <Text style={styles.avatarText}>H</Text>
           </View>
 
-          <Text style={styles.name}>Leo</Text>
-          <Text style={styles.username}>@fomo_leo</Text>
+          <Text style={styles.name}>Hive User</Text>
+          <Text style={styles.username}>{email || "No email found"}</Text>
 
           <Text style={styles.bio}>
-            Building the city’s nightlife one event at a time. Music, energy, local moments.
+            Discovering local events and building the city’s social scene through Hive.
           </Text>
 
           <View style={styles.actionRow}>
-            <Pressable style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Edit Profile</Text>
+            <Pressable style={styles.primaryButton} onPress={loadProfile}>
+              <Text style={styles.primaryButtonText}>Refresh</Text>
             </Pressable>
 
-            <Pressable style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Share</Text>
+            <Pressable style={styles.secondaryButton} onPress={handleLogout}>
+              <Text style={styles.secondaryButtonText}>Log Out</Text>
             </Pressable>
           </View>
         </View>
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>12</Text>
-            <Text style={styles.statLabel}>Events</Text>
+            <Text style={styles.statNumber}>{loading ? "..." : myEvents.length}</Text>
+            <Text style={styles.statLabel}>My Events</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>84</Text>
+            <Text style={styles.statNumber}>—</Text>
+            <Text style={styles.statLabel}>Saved</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>—</Text>
             <Text style={styles.statLabel}>Going</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>231</Text>
-            <Text style={styles.statLabel}>Followers</Text>
           </View>
         </View>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>My Events</Text>
-          <Text style={styles.sectionLink}>View all</Text>
+          <Text style={styles.sectionLink}>{loading ? "Loading..." : `${myEvents.length} total`}</Text>
         </View>
+
+        {!loading && myEvents.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No events yet</Text>
+            <Text style={styles.emptyText}>
+              Create your first event and it will appear here.
+            </Text>
+          </View>
+        ) : null}
 
         {myEvents.map((event) => (
           <Pressable key={event.id} style={styles.eventCard}>
@@ -94,12 +151,12 @@ export default function ProfileScreen() {
             <View style={styles.eventBody}>
               <View style={styles.eventTextWrap}>
                 <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.eventMeta}>{event.time}</Text>
+                <Text style={styles.eventMeta}>{event.date_label}</Text>
                 <Text style={styles.eventLocation}>{event.location}</Text>
               </View>
 
               <View style={styles.liveBadge}>
-                <Text style={styles.liveBadgeText}>Live</Text>
+                <Text style={styles.liveBadgeText}>Posted</Text>
               </View>
             </View>
           </Pressable>
@@ -233,6 +290,25 @@ const styles = StyleSheet.create({
     color: "#8E99BE",
     fontSize: 14,
     fontWeight: "700",
+  },
+  emptyCard: {
+    backgroundColor: "#0B1124",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#18213F",
+    padding: 18,
+    marginBottom: 14,
+  },
+  emptyTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  emptyText: {
+    color: "#98A2C7",
+    fontSize: 14,
+    lineHeight: 22,
   },
   eventCard: {
     backgroundColor: "#0B1124",

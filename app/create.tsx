@@ -1,16 +1,17 @@
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Alert,
-    ImageBackground,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  ImageBackground,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+import { requireCurrentUserId } from "../lib/currentUser";
 import { supabase } from "../lib/supabase";
 
 export default function CreateScreen() {
@@ -18,6 +19,7 @@ export default function CreateScreen() {
   const [category, setCategory] = useState("");
   const [dateLabel, setDateLabel] = useState("");
   const [location, setLocation] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,35 +29,48 @@ export default function CreateScreen() {
       return;
     }
 
-    setSubmitting(true);
+    try {
+      setSubmitting(true);
 
-    const { error } = await supabase.from("events").insert([
-      {
-        title,
-        category,
-        date_label: dateLabel,
-        location,
-        interested: 0,
-        image:
-          "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1200&q=80",
-        featured: false,
-      },
-    ]);
+      const userId = await requireCurrentUserId();
 
-    setSubmitting(false);
+      const finalImage =
+        imageUrl.trim() ||
+        "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1200&q=80";
 
-    if (error) {
-      Alert.alert("Could not post event", error.message);
-      return;
+      const { error } = await supabase.from("events").insert([
+        {
+          title,
+          category,
+          date_label: dateLabel,
+          location,
+          interested: 0,
+          image: finalImage,
+          featured: false,
+          creator_id: userId,
+        },
+      ]);
+
+      if (error) {
+        Alert.alert("Could not post event", error.message);
+        return;
+      }
+
+      Alert.alert("Success", "Event posted.");
+      setTitle("");
+      setCategory("");
+      setDateLabel("");
+      setLocation("");
+      setImageUrl("");
+      setDescription("");
+      router.push("/");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong posting this event.";
+      Alert.alert("Post error", message);
+    } finally {
+      setSubmitting(false);
     }
-
-    Alert.alert("Success", "Event posted.");
-    setTitle("");
-    setCategory("");
-    setDateLabel("");
-    setLocation("");
-    setDescription("");
-    router.push("/");
   };
 
   return (
@@ -70,17 +85,19 @@ export default function CreateScreen() {
 
         <Pressable
           style={styles.imageUploadCard}
-          onPress={() => Alert.alert("Upload", "Real image upload comes later")}
+          onPress={() => Alert.alert("Image", "Image upload storage comes later")}
         >
           <ImageBackground
             source={{
-              uri: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1200&q=80",
+              uri:
+                imageUrl.trim() ||
+                "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1200&q=80",
             }}
             style={styles.imageUploadBackground}
             imageStyle={styles.imageUploadStyle}
           >
             <View style={styles.imageOverlay} />
-            <Text style={styles.imageUploadText}>Tap to change cover image</Text>
+            <Text style={styles.imageUploadText}>Event cover preview</Text>
           </ImageBackground>
         </Pressable>
 
@@ -92,6 +109,7 @@ export default function CreateScreen() {
             placeholderTextColor="#7F89B0"
             style={styles.input}
           />
+
           <TextInput
             value={category}
             onChangeText={setCategory}
@@ -99,6 +117,7 @@ export default function CreateScreen() {
             placeholderTextColor="#7F89B0"
             style={styles.input}
           />
+
           <TextInput
             value={dateLabel}
             onChangeText={setDateLabel}
@@ -106,6 +125,7 @@ export default function CreateScreen() {
             placeholderTextColor="#7F89B0"
             style={styles.input}
           />
+
           <TextInput
             value={location}
             onChangeText={setLocation}
@@ -113,10 +133,19 @@ export default function CreateScreen() {
             placeholderTextColor="#7F89B0"
             style={styles.input}
           />
+
+          <TextInput
+            value={imageUrl}
+            onChangeText={setImageUrl}
+            placeholder="Image URL (optional)"
+            placeholderTextColor="#7F89B0"
+            style={styles.input}
+          />
+
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Description"
+            placeholder="Description (not saved yet)"
             placeholderTextColor="#7F89B0"
             style={[styles.input, styles.textArea]}
             multiline

@@ -1,16 +1,17 @@
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    Alert,
-    ImageBackground,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  ImageBackground,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import { requireCurrentUserId } from "../lib/currentUser";
 import { supabase } from "../lib/supabase";
 
 type Category =
@@ -28,10 +29,24 @@ type EventItem = {
   date_label: string;
   location: string;
   interested: number;
-  category: Exclude<Category, "All">;
+  category: Exclude<Category, "All"> | string;
   image: string;
   featured?: boolean;
   created_at?: string;
+  creator_id?: string | null;
+};
+
+type SavedEventRow = {
+  id: string;
+  event_id: string;
+  user_id: string;
+};
+
+type EventInterestRow = {
+  id: string;
+  event_id: string;
+  user_id: string;
+  status: "interested" | "going";
 };
 
 const CATEGORIES: Category[] = [
@@ -52,25 +67,66 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchEvents();
+    loadHomeData();
   }, []);
 
-  const fetchEvents = async () => {
+  const loadHomeData = async () => {
     setLoading(true);
+    try {
+      await Promise.all([fetchEvents(), fetchSavedEvents(), fetchInterestedEvents()]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong loading the home feed.";
+      Alert.alert("Load error", message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const fetchEvents = async () => {
     const { data, error } = await supabase
       .from("events")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {
-      Alert.alert("Error loading events", error.message);
-      setLoading(false);
-      return;
+      throw new Error(error.message);
     }
 
     setEvents((data as EventItem[]) || []);
-    setLoading(false);
+  };
+
+  const fetchSavedEvents = async () => {
+    const userId = await requireCurrentUserId();
+
+    const { data, error } = await supabase
+      .from("saved_events")
+      .select("id, event_id, user_id")
+      .eq("user_id", userId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const rows = (data as SavedEventRow[]) || [];
+    setSavedIds(rows.map((row) => row.event_id));
+  };
+
+  const fetchInterestedEvents = async () => {
+    const userId = await requireCurrentUserId();
+
+    const { data, error } = await supabase
+      .from("event_interests")
+      .select("id, event_id, user_id, status")
+      .eq("user_id", userId)
+      .eq("status", "interested");
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const rows = (data as EventInterestRow[]) || [];
+    setLikedIds(rows.map((row) => row.event_id));
   };
 
   const featuredEvent = events.find((event) => event.featured) ?? events[0];
@@ -89,20 +145,95 @@ export default function HomeScreen() {
     if (tab === "Profile") router.push("/profile");
   };
 
-  const handleOpenEvent = (_title: string) => {
-    router.push("/event-details");
+  const handleOpenEvent = (eventId: string) => {
+    router.push({
+      pathname: "/event-details",
+      params: { eventId },
+    });
   };
 
-  const toggleSave = (id: string) => {
-    setSavedIds((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
-    );
+  const toggleSave = async (eventId: string) => {
+    try {
+      const userId = await requireCurrentUserId();
+      const isSaved = savedIds.includes(eventId);
+
+      if (isSaved) {
+        const { error } = await supabase
+          .from("saved_events")
+          .delete()
+          .eq("user_id", userId)
+          .eq("event_id", eventId);
+
+        if (error) {
+          Alert.alert("Could not unsave event", error.message);
+          return;
+        }
+
+        setSavedIds((current) => current.filter((id) => id !== eventId));
+        return;
+      }
+
+      const { error } = await supabase.from("saved_events").insert([
+        {
+          user_id: userId,
+          event_id: eventId,
+        },
+      ]);
+
+      if (error) {
+        Alert.alert("Could not save event", error.message);
+        return;
+      }
+
+      setSavedIds((current) => [...current, eventId]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong saving this event.";
+      Alert.alert("Save error", message);
+    }
   };
 
-  const toggleLike = (id: string) => {
-    setLikedIds((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
-    );
+  const toggleLike = async (eventId: string) => {
+    try {
+      const userId = await requireCurrentUserId();
+      const isLiked = likedIds.includes(eventId);
+
+      if (isLiked) {
+        const { error } = await supabase
+          .from("event_interests")
+          .delete()
+          .eq("user_id", userId)
+          .eq("event_id", eventId)
+          .eq("status", "interested");
+
+        if (error) {
+          Alert.alert("Could not remove interest", error.message);
+          return;
+        }
+
+        setLikedIds((current) => current.filter((id) => id !== eventId));
+        return;
+      }
+
+      const { error } = await supabase.from("event_interests").insert([
+        {
+          user_id: userId,
+          event_id: eventId,
+          status: "interested",
+        },
+      ]);
+
+      if (error) {
+        Alert.alert("Could not mark interested", error.message);
+        return;
+      }
+
+      setLikedIds((current) => [...current, eventId]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong updating interest.";
+      Alert.alert("Interest error", message);
+    }
   };
 
   if (loading) {
@@ -155,7 +286,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <Pressable onPress={() => handleOpenEvent(featuredEvent.title)}>
+        <Pressable onPress={() => handleOpenEvent(featuredEvent.id)}>
           <ImageBackground
             source={{ uri: featuredEvent.image }}
             style={styles.heroCard}
@@ -172,7 +303,7 @@ export default function HomeScreen() {
               <View style={styles.heroActions}>
                 <Pressable
                   style={styles.primaryButton}
-                  onPress={() => handleOpenEvent(featuredEvent.title)}
+                  onPress={() => handleOpenEvent(featuredEvent.id)}
                 >
                   <Text style={styles.primaryButtonText}>View Event</Text>
                 </Pressable>
@@ -215,7 +346,7 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>🔥 Happening Tonight</Text>
-          <Pressable onPress={fetchEvents}>
+          <Pressable onPress={loadHomeData}>
             <Text style={styles.sectionLink}>Refresh</Text>
           </Pressable>
         </View>
@@ -227,7 +358,7 @@ export default function HomeScreen() {
           return (
             <Pressable
               key={event.id}
-              onPress={() => handleOpenEvent(event.title)}
+              onPress={() => handleOpenEvent(event.id)}
               style={styles.eventCard}
             >
               <ImageBackground
