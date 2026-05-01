@@ -1,241 +1,224 @@
+import { router } from "expo-router";
 import React from "react";
 import {
-    Alert,
-    ImageBackground,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Image,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
-const categories = [
+const CATEGORY_CARDS = [
   {
-    id: "1",
-    title: "Music",
+    title: "Live Music",
     image:
-      "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=800&q=80",
+    backgroundColor: "#F2F2F2",
+    textColor: "#111111",
   },
   {
-    id: "2",
+    title: "Outdoors",
+    image:
+      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    backgroundColor: "#C7D7A4",
+    textColor: "#111111",
+  },
+  {
+    title: "Community Events",
+    image:
+      "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=80",
+    backgroundColor: "#7E72C8",
+    textColor: "#FFFFFF",
+  },
+  {
+    title: "Romantic",
+    image:
+      "https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=80",
+    backgroundColor: "#8D1714",
+    textColor: "#FFFFFF",
+  },
+  {
     title: "Food",
+    image:
+      "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
+    backgroundColor: "#6A3718",
+    textColor: "#FFFFFF",
+  },
+  {
+    title: "Sports",
+    image:
+      "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=800&q=80",
+    backgroundColor: "#74B344",
+    textColor: "#FFFFFF",
+  },
+];
+
+const COMMUNITY_VIDEOS = [
+  {
+    title: "Washer Hockey Game",
+    creator: "@ianorozco",
+    image:
+      "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=800&q=80",
+  },
+  {
+    title: "Mango Sticky Rice",
+    creator: "@kaylaeats",
+    image:
+      "https://images.unsplash.com/photo-1467453678174-768ec283a940?auto=format&fit=crop&w=800&q=80",
+  },
+  {
+    title: "Fresh Cookies",
+    creator: "@nightmarket",
+    image:
+      "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=800&q=80",
+  },
+];
+
+const UPCOMING_EVENTS = [
+  {
+    title: "Soft Opening",
+    subtitle: "Temporary Store Hours",
+    meta: "4/20 - 5/15 • Open daily 9AM - 3PM",
     image:
       "https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1200&q=80",
   },
   {
-    id: "3",
-    title: "Comedy",
+    title: "Monster Truck Tour",
+    subtitle: "Live at Bakersfield Fairgrounds",
+    meta: "Friday 8PM • Tickets on sale now",
     image:
-      "https://images.unsplash.com/photo-1527224857830-43a7acc85260?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "4",
-    title: "Nightlife",
-    image:
-      "https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "5",
-    title: "Sports",
-    image:
-      "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "6",
-    title: "Outdoors",
-    image:
-      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
-  },
-];
-
-const trendingEvents = [
-  {
-    id: "1",
-    title: "Neon Nights DJ Pulse",
-    meta: "Fri, Apr 25 • 10:00 PM",
-    location: "The Echo Lounge",
-    interested: 124,
-    image:
-      "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "2",
-    title: "Taco & Beer Fest",
-    meta: "Sat, Apr 26 • 6:00 PM",
-    location: "Downtown Lot",
-    interested: 89,
-    image:
-      "https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "3",
-    title: "Saturday Night Laughs",
-    meta: "Sat, Apr 26 • 8:00 PM",
-    location: "Comedy Den",
-    interested: 76,
-    image:
-      "https://images.unsplash.com/photo-1527224857830-43a7acc85260?auto=format&fit=crop&w=1200&q=80",
-  },
-];
-
-const weekendEvents = [
-  {
-    id: "1",
-    day: "FRI",
-    date: "26",
-    title: "Lo-Fi Beats & Brews",
-    time: "7:00 PM",
-    image:
-      "https://images.unsplash.com/photo-1571266028243-d220c9b5b362?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "2",
-    day: "SAT",
-    date: "27",
-    title: "Sunset Rooftop Session",
-    time: "8:30 PM",
-    image:
-      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    id: "3",
-    day: "SUN",
-    date: "28",
-    title: "Local Artist Pop-Up",
-    time: "12:00 PM",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80",
   },
 ];
 
 export default function DiscoverScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.title}>Discovery</Text>
-            <Text style={styles.subtitle}>Find events that match your vibe</Text>
+        <View style={styles.topBar}>
+          <Image
+            source={{
+              uri: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80",
+            }}
+            style={styles.avatar}
+          />
+
+          <Text style={styles.cityText}>LOS ANGELES</Text>
+
+          <Pressable style={styles.iconWrap}>
+            <Text style={styles.bellIcon}>◠</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            placeholder="Search artists, venues, or categories"
+            placeholderTextColor="#7B7B7B"
+            style={styles.searchInput}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>BROWSE EVENTS</Text>
+
+          <View style={styles.categoryGrid}>
+            {CATEGORY_CARDS.map((card) => (
+              <Pressable
+                key={card.title}
+                style={[styles.categoryCard, { backgroundColor: card.backgroundColor }]}
+              >
+                <Text style={[styles.categoryTitle, { color: card.textColor }]}>{card.title}</Text>
+
+                <Image
+                  source={{ uri: card.image }}
+                  style={styles.categoryImage}
+                  resizeMode="contain"
+                />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>COMMUNITY VIDEOS</Text>
+            <Text style={styles.sectionLink}>View all</Text>
           </View>
 
-          <Pressable
-            style={styles.iconButton}
-            onPress={() => Alert.alert("Notifications", "Coming later")}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.videoRow}
           >
-            <Text style={styles.iconText}>🔔</Text>
-          </Pressable>
-        </View>
-
-        <Pressable onPress={() => Alert.alert("Search", "Search behavior comes next")}>
-          <View pointerEvents="none" style={styles.searchWrap}>
-            <Text style={styles.searchIcon}>⌕</Text>
-            <TextInput
-              editable={false}
-              placeholder="Search events, venues, DJs, food..."
-              placeholderTextColor="#7F89B0"
-              style={styles.searchInput}
-            />
-          </View>
-        </Pressable>
-
-        <Text style={styles.sectionTitle}>Browse Categories</Text>
-
-        <View style={styles.categoryGrid}>
-          {categories.map((item) => (
-            <Pressable
-              key={item.id}
-              style={styles.categoryCard}
-              onPress={() => Alert.alert(item.title, `${item.title} filter comes next`)}
-            >
-              <ImageBackground
-                source={{ uri: item.image }}
-                style={styles.categoryImage}
-                imageStyle={styles.categoryImageStyle}
-              >
-                <View style={styles.categoryOverlay} />
-                <Text style={styles.categoryTitle}>{item.title}</Text>
-              </ImageBackground>
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>🔥 Trending Near You</Text>
-          <Pressable onPress={() => Alert.alert("More", "Full trending list later")}>
-            <Text style={styles.linkText}>See all</Text>
-          </Pressable>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalRow}
-        >
-          {trendingEvents.map((event) => (
-            <Pressable
-              key={event.id}
-              style={styles.trendingCard}
-              onPress={() => Alert.alert(event.title, "Open event details next")}
-            >
-              <ImageBackground
-                source={{ uri: event.image }}
-                style={styles.trendingImage}
-                imageStyle={styles.trendingImageStyle}
-              >
-                <View style={styles.trendingBadge}>
-                  <Text style={styles.trendingBadgeText}>🔥 {event.interested} interested</Text>
+            {COMMUNITY_VIDEOS.map((video) => (
+              <Pressable key={video.title} style={styles.videoCard}>
+                <Image source={{ uri: video.image }} style={styles.videoImage} />
+                <View style={styles.videoOverlay} />
+                <View style={styles.videoBadge}>
+                  <Text style={styles.videoBadgeText}>▶</Text>
                 </View>
-              </ImageBackground>
+                <View style={styles.videoTextWrap}>
+                  <Text style={styles.videoTitle}>{video.title}</Text>
+                  <Text style={styles.videoCreator}>{video.creator}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
 
-              <View style={styles.trendingBody}>
-                <Text style={styles.trendingTitle}>{event.title}</Text>
-                <Text style={styles.trendingMeta}>{event.meta}</Text>
-                <Text style={styles.trendingLocation}>{event.location}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>UPCOMING EVENTS</Text>
+
+          {UPCOMING_EVENTS.map((event) => (
+            <Pressable key={event.title} style={styles.upcomingCard}>
+              <Image source={{ uri: event.image }} style={styles.upcomingImage} />
+              <View style={styles.upcomingOverlay} />
+              <View style={styles.upcomingContent}>
+                <Text style={styles.upcomingTitle}>{event.title}</Text>
+                <Text style={styles.upcomingSubtitle}>{event.subtitle}</Text>
+                <Text style={styles.upcomingMeta}>{event.meta}</Text>
               </View>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>🗓️ This Weekend</Text>
-          <Pressable onPress={() => Alert.alert("More", "Weekend list later")}>
-            <Text style={styles.linkText}>See all</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.weekendList}>
-          {weekendEvents.map((event) => (
-            <Pressable
-              key={event.id}
-              style={styles.weekendCard}
-              onPress={() => Alert.alert(event.title, "Open event details next")}
-            >
-              <ImageBackground
-                source={{ uri: event.image }}
-                style={styles.weekendImage}
-                imageStyle={styles.weekendImageStyle}
-              >
-                <View style={styles.weekendOverlay} />
-                <View style={styles.datePill}>
-                  <Text style={styles.datePillDay}>{event.day}</Text>
-                  <Text style={styles.datePillDate}>{event.date}</Text>
-                </View>
-
-                <View style={styles.weekendTextWrap}>
-                  <Text style={styles.weekendTitle}>{event.title}</Text>
-                  <Text style={styles.weekendTime}>{event.time}</Text>
-                </View>
-              </ImageBackground>
             </Pressable>
           ))}
         </View>
       </ScrollView>
+
+      <View style={styles.bottomNav}>
+        <Pressable style={styles.navItem} onPress={() => router.push("/home")}>
+          <Text style={styles.navIcon}>⌂</Text>
+        </Pressable>
+
+        <Pressable style={styles.navItem} onPress={() => router.push("/discover")}>
+          <Text style={[styles.navIcon, styles.activeNav]}>◉</Text>
+        </Pressable>
+
+        <Pressable style={styles.centerButton} onPress={() => router.push("/create")}>
+          <Text style={styles.centerButtonText}>＋</Text>
+        </Pressable>
+
+        <Pressable style={styles.navItem}>
+          <Text style={styles.navIcon}>🗺</Text>
+        </Pressable>
+
+        <Pressable style={styles.navItem} onPress={() => router.push("/profile")}>
+          <Image
+            source={{
+              uri: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80",
+            }}
+            style={styles.navAvatar}
+          />
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -243,226 +226,252 @@ export default function DiscoverScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#050816",
+    backgroundColor: "#1B1B1D",
   },
   container: {
     flex: 1,
-    backgroundColor: "#050816",
+    backgroundColor: "#1B1B1D",
   },
   contentContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 110,
   },
-  headerRow: {
+  topBar: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "flex-start",
     marginBottom: 18,
   },
-  title: {
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  cityText: {
     color: "#FFFFFF",
-    fontSize: 34,
+    fontSize: 18,
     fontWeight: "800",
-    marginBottom: 4,
+    letterSpacing: 0.6,
   },
-  subtitle: {
-    color: "#98A2C7",
-    fontSize: 16,
-  },
-  iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#10162A",
-    justifyContent: "center",
+  iconWrap: {
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#1A2340",
+    justifyContent: "center",
+    width: 28,
   },
-  iconText: {
+  bellIcon: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 22,
+    fontWeight: "600",
   },
-  searchWrap: {
+  searchBar: {
+    height: 42,
+    backgroundColor: "#F3F3F3",
+    borderRadius: 6,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#0E1327",
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: "#6B4DFF",
-    paddingHorizontal: 16,
-    marginBottom: 22,
-    shadowColor: "#6B4DFF",
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 5,
+    paddingHorizontal: 12,
+    marginBottom: 28,
   },
   searchIcon: {
-    color: "#A4AADB",
-    fontSize: 20,
-    marginRight: 10,
+    color: "#6F6F6F",
+    fontSize: 14,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    color: "#FFFFFF",
-    paddingVertical: 16,
-    fontSize: 16,
+    color: "#111111",
+    fontSize: 12,
+    textTransform: "uppercase",
   },
-  sectionHeader: {
-    marginTop: 6,
-    marginBottom: 12,
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 12,
   },
   sectionTitle: {
     color: "#FFFFFF",
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 17,
+    fontWeight: "900",
     marginBottom: 12,
   },
-  linkText: {
-    color: "#9A7BFF",
-    fontSize: 15,
+  sectionLink: {
+    color: "#BEBEBE",
+    fontSize: 11,
     fontWeight: "700",
+    textTransform: "uppercase",
   },
   categoryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    marginBottom: 14,
+    gap: 10,
   },
   categoryCard: {
-    width: "48.5%",
-    marginBottom: 12,
-    borderRadius: 18,
+    width: "48.4%",
+    height: 62,
+    borderRadius: 4,
     overflow: "hidden",
-    backgroundColor: "#0B1124",
-  },
-  categoryImage: {
-    height: 118,
-    justifyContent: "flex-end",
-  },
-  categoryImageStyle: {
-    borderRadius: 18,
-  },
-  categoryOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(6, 10, 22, 0.28)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    justifyContent: "space-between",
+    position: "relative",
   },
   categoryTitle: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "800",
-    padding: 14,
+    fontSize: 9,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    zIndex: 2,
+    maxWidth: "65%",
   },
-  horizontalRow: {
-    paddingBottom: 8,
-    gap: 14,
+  categoryImage: {
+    position: "absolute",
+    right: 6,
+    bottom: 0,
+    width: 64,
+    height: 64,
   },
-  trendingCard: {
-    width: 265,
-    backgroundColor: "#0B1124",
-    borderRadius: 22,
+  videoRow: {
+    gap: 10,
+  },
+  videoCard: {
+    width: 108,
+    height: 160,
+    borderRadius: 8,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#18213F",
+    backgroundColor: "#2B2B2E",
+    position: "relative",
   },
-  trendingImage: {
-    height: 170,
-    justifyContent: "flex-start",
+  videoImage: {
+    width: "100%",
+    height: "100%",
   },
-  trendingImageStyle: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-  },
-  trendingBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(12, 18, 36, 0.86)",
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    marginTop: 12,
-    marginLeft: 12,
-  },
-  trendingBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  trendingBody: {
-    padding: 14,
-  },
-  trendingTitle: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 6,
-  },
-  trendingMeta: {
-    color: "#D9DDF2",
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  trendingLocation: {
-    color: "#95A0C6",
-    fontSize: 14,
-  },
-  weekendList: {
-    gap: 12,
-    paddingBottom: 20,
-  },
-  weekendCard: {
-    borderRadius: 22,
-    overflow: "hidden",
-    backgroundColor: "#0B1124",
-    borderWidth: 1,
-    borderColor: "#18213F",
-  },
-  weekendImage: {
-    height: 122,
-    justifyContent: "space-between",
-    padding: 14,
-  },
-  weekendImageStyle: {
-    borderRadius: 22,
-  },
-  weekendOverlay: {
+  videoOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(6, 10, 22, 0.34)",
+    backgroundColor: "rgba(0,0,0,0.14)",
   },
-  datePill: {
-    width: 58,
-    borderRadius: 16,
-    backgroundColor: "rgba(92, 83, 255, 0.95)",
-    paddingVertical: 8,
+  videoBadge: {
+    position: "absolute",
+    right: 8,
+    top: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
     alignItems: "center",
   },
-  datePillDay: {
-    color: "#E8EAFF",
+  videoBadgeText: {
+    color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "800",
+    marginLeft: 1,
   },
-  datePillDate: {
+  videoTextWrap: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    bottom: 8,
+  },
+  videoTitle: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  videoCreator: {
+    color: "#F1F1F1",
+    fontSize: 8,
+    fontWeight: "600",
+  },
+  upcomingCard: {
+    height: 84,
+    borderRadius: 6,
+    overflow: "hidden",
+    marginBottom: 12,
+    backgroundColor: "#2B2B2E",
+    position: "relative",
+  },
+  upcomingImage: {
+    width: "100%",
+    height: "100%",
+  },
+  upcomingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+  upcomingContent: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    top: 14,
+    bottom: 14,
+    justifyContent: "center",
+  },
+  upcomingTitle: {
+    color: "#7D2A22",
+    fontSize: 16,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  upcomingSubtitle: {
+    color: "#8F4A3D",
+    fontSize: 9,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  upcomingMeta: {
+    color: "#5E3E37",
+    fontSize: 8,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  bottomNav: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    bottom: 16,
+    height: 64,
+    backgroundColor: "#0E0E10",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    borderRadius: 2,
+  },
+  navItem: {
+    width: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navIcon: {
     color: "#FFFFFF",
     fontSize: 22,
-    fontWeight: "800",
-    marginTop: 1,
   },
-  weekendTextWrap: {
-    marginTop: "auto",
-  },
-  weekendTitle: {
+  activeNav: {
     color: "#FFFFFF",
-    fontSize: 23,
-    fontWeight: "800",
-    marginBottom: 3,
   },
-  weekendTime: {
-    color: "#D7DCF0",
-    fontSize: 15,
-    fontWeight: "600",
+  centerButton: {
+    width: 54,
+    height: 54,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  centerButtonText: {
+    color: "#FFFFFF",
+    fontSize: 34,
+    fontWeight: "500",
+    marginTop: -2,
+  },
+  navAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
 });

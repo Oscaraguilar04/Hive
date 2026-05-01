@@ -1,167 +1,176 @@
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  ImageBackground,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import { supabase } from "../lib/supabase";
-import { signOutUser } from "../lib/auth";
-import { requireCurrentUserId } from "../lib/currentUser";
-
-type EventRow = {
-  id: string;
-  title: string;
-  date_label: string;
-  location: string;
-  image: string;
-  creator_id?: string | null;
-};
+import UserAvatar from "../components/UserAvatar";
+import {
+  getMyProfile,
+  pickImageFromLibrary,
+  updateMyProfile,
+  uploadAvatarAsync,
+} from "../lib/profile";
 
 export default function ProfileScreen() {
-  const [email, setEmail] = useState("");
-  const [myEvents, setMyEvents] = useState<EventRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fullName, setFullName] = useState("Hive User");
+  const [bio, setBio] = useState("Discovering the best events nearby.");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const loadProfile = async () => {
+    try {
+      const profile = await getMyProfile();
+      if (!profile) return;
+
+      setFullName(profile.full_name ?? "Hive User");
+      setBio(profile.bio ?? "Discovering the best events nearby.");
+      setAvatarUrl(profile.avatar_url ?? null);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not load profile.";
+      Alert.alert("Profile error", message);
+    }
+  };
 
   useEffect(() => {
     loadProfile();
   }, []);
 
-  const loadProfile = async () => {
+  const handlePickAvatar = async () => {
     try {
-      setLoading(true);
+      const localUri = await pickImageFromLibrary();
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      if (!localUri) return;
 
-      if (user?.email) {
-        setEmail(user.email);
-      }
-
-      const userId = await requireCurrentUserId();
-
-      const { data, error } = await supabase
-        .from("events")
-        .select("id, title, date_label, location, image, creator_id")
-        .eq("creator_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      setMyEvents((data as EventRow[]) || []);
+      setSaving(true);
+      const publicUrl = await uploadAvatarAsync(localUri);
+      setAvatarUrl(publicUrl);
+      Alert.alert("Success", "Profile photo updated.");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Something went wrong loading profile.";
-      Alert.alert("Profile error", message);
+        error instanceof Error ? error.message : "Could not update profile photo.";
+      Alert.alert("Upload error", message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleLogout = async () => {
-    const { error } = await signOutUser();
-
-    if (error) {
-      Alert.alert("Logout error", error.message);
-      return;
+  const handleSaveProfile = async () => {
+    try {
+      setSaving(true);
+      await updateMyProfile({
+        full_name: fullName,
+        bio,
+      });
+      Alert.alert("Saved", "Profile updated.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save profile.";
+      Alert.alert("Save error", message);
+    } finally {
+      setSaving(false);
     }
-
-    router.replace("/login");
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>H</Text>
-          </View>
+        <View style={styles.headerImageWrap}>
+          <Image
+            source={{
+              uri: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80",
+            }}
+            style={styles.headerImage}
+          />
 
-          <Text style={styles.name}>Hive User</Text>
-          <Text style={styles.username}>{email || "No email found"}</Text>
-
-          <Text style={styles.bio}>
-            Discovering local events and building the city’s social scene through Hive.
-          </Text>
-
-          <View style={styles.actionRow}>
-            <Pressable style={styles.primaryButton} onPress={loadProfile}>
-              <Text style={styles.primaryButtonText}>Refresh</Text>
-            </Pressable>
-
-            <Pressable style={styles.secondaryButton} onPress={handleLogout}>
-              <Text style={styles.secondaryButtonText}>Log Out</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{loading ? "..." : myEvents.length}</Text>
-            <Text style={styles.statLabel}>My Events</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>—</Text>
-            <Text style={styles.statLabel}>Saved</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>—</Text>
-            <Text style={styles.statLabel}>Going</Text>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>My Events</Text>
-          <Text style={styles.sectionLink}>{loading ? "Loading..." : `${myEvents.length} total`}</Text>
-        </View>
-
-        {!loading && myEvents.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No events yet</Text>
-            <Text style={styles.emptyText}>
-              Create your first event and it will appear here.
-            </Text>
-          </View>
-        ) : null}
-
-        {myEvents.map((event) => (
-          <Pressable key={event.id} style={styles.eventCard}>
-            <ImageBackground
-              source={{ uri: event.image }}
-              style={styles.eventImage}
-              imageStyle={styles.eventImageStyle}
-            >
-              <View style={styles.imageOverlay} />
-            </ImageBackground>
-
-            <View style={styles.eventBody}>
-              <View style={styles.eventTextWrap}>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.eventMeta}>{event.date_label}</Text>
-                <Text style={styles.eventLocation}>{event.location}</Text>
-              </View>
-
-              <View style={styles.liveBadge}>
-                <Text style={styles.liveBadgeText}>Posted</Text>
-              </View>
-            </View>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </Pressable>
-        ))}
+
+          <Pressable style={styles.settingsButton}>
+            <Ionicons name="settings-sharp" size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        <View style={styles.avatarWrap}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.largeAvatar} />
+          ) : (
+            <View style={styles.largeFallback}>
+              <Text style={styles.largeFallbackText}>H</Text>
+            </View>
+          )}
+
+          <Pressable style={styles.avatarEditButton} onPress={handlePickAvatar}>
+            <Ionicons name="camera" size={16} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        <TextInput
+          value={fullName}
+          onChangeText={setFullName}
+          style={styles.nameInput}
+          placeholder="Your name"
+          placeholderTextColor="#7F7F86"
+        />
+
+        <TextInput
+          value={bio}
+          onChangeText={setBio}
+          style={styles.bioInput}
+          placeholder="Add a short bio"
+          placeholderTextColor="#7F7F86"
+          multiline
+        />
+
+        <Pressable
+          style={[styles.primaryButton, saving && styles.disabled]}
+          onPress={handleSaveProfile}
+          disabled={saving}
+        >
+          <Text style={styles.primaryButtonText}>
+            {saving ? "Saving..." : "Save Profile"}
+          </Text>
+        </Pressable>
       </ScrollView>
+
+      <View style={styles.bottomNav}>
+        <Pressable style={styles.navItem} onPress={() => router.push("/home" as any)}>
+          <Ionicons name="home-outline" size={22} color="#F3F3F5" />
+        </Pressable>
+
+        <Pressable style={styles.navItem} onPress={() => router.push("/discover" as any)}>
+          <Ionicons name="compass-outline" size={22} color="#F3F3F5" />
+        </Pressable>
+
+        <Pressable style={styles.navItem} onPress={() => router.push("/create" as any)}>
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </Pressable>
+
+        <Pressable style={styles.navItem} onPress={() => router.push("/map" as any)}>
+          <Ionicons name="map-outline" size={22} color="#F3F3F5" />
+        </Pressable>
+
+        <Pressable style={styles.navItem} onPress={() => router.push("/profile" as any)}>
+          <View style={styles.activeIndicator} />
+          <UserAvatar size={28} />
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -169,202 +178,145 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#050816",
+    backgroundColor: "#000000",
   },
   container: {
     flex: 1,
-    backgroundColor: "#050816",
+    backgroundColor: "#111113",
   },
   contentContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 40,
+    paddingBottom: 110,
   },
-  headerCard: {
-    backgroundColor: "#0B1124",
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "#18213F",
-    padding: 22,
+  headerImageWrap: {
+    height: 220,
+    position: "relative",
+  },
+  headerImage: {
+    width: "100%",
+    height: "100%",
+  },
+  backButton: {
+    position: "absolute",
+    top: 20,
+    left: 18,
+    width: 46,
+    height: 46,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.45)",
     alignItems: "center",
-    marginBottom: 18,
-  },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: "#5A6BFF",
     justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 14,
   },
-  avatarText: {
+  settingsButton: {
+    position: "absolute",
+    top: 20,
+    right: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarWrap: {
+    alignSelf: "center",
+    marginTop: -70,
+    marginBottom: 18,
+    position: "relative",
+  },
+  largeAvatar: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 4,
+    borderColor: "#111113",
+  },
+  largeFallback: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 4,
+    borderColor: "#111113",
+    backgroundColor: "#2A2A30",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  largeFallbackText: {
     color: "#FFFFFF",
-    fontSize: 34,
+    fontSize: 36,
     fontWeight: "800",
   },
-  name: {
+  avatarEditButton: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#6E7BFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nameInput: {
+    marginHorizontal: 24,
     color: "#FFFFFF",
     fontSize: 28,
     fontWeight: "800",
-    marginBottom: 4,
-  },
-  username: {
-    color: "#8E99BE",
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-  bio: {
-    color: "#CDD4EF",
-    fontSize: 15,
-    lineHeight: 23,
     textAlign: "center",
+    marginBottom: 10,
+  },
+  bioInput: {
+    marginHorizontal: 24,
+    color: "#CFCFD4",
+    fontSize: 14,
+    textAlign: "center",
+    minHeight: 70,
     marginBottom: 18,
   },
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
   primaryButton: {
-    backgroundColor: "#5A6BFF",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 14,
+    marginHorizontal: 24,
+    backgroundColor: "#F4F4F5",
+    height: 52,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  disabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
-    color: "#FFFFFF",
+    color: "#111111",
     fontSize: 14,
     fontWeight: "800",
+    textTransform: "uppercase",
   },
-  secondaryButton: {
-    backgroundColor: "#151D37",
-    borderWidth: 1,
-    borderColor: "#263256",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-  },
-  secondaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  statsRow: {
+  bottomNav: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 84,
+    backgroundColor: "#08080B",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  statCard: {
-    width: "31.5%",
-    backgroundColor: "#0B1124",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#18213F",
-    paddingVertical: 18,
     alignItems: "center",
+    justifyContent: "space-around",
+    paddingBottom: 14,
+    paddingTop: 8,
   },
-  statNumber: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  statLabel: {
-    color: "#8E99BE",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "800",
-  },
-  sectionLink: {
-    color: "#8E99BE",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  emptyCard: {
-    backgroundColor: "#0B1124",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#18213F",
-    padding: 18,
-    marginBottom: 14,
-  },
-  emptyTitle: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: 6,
-  },
-  emptyText: {
-    color: "#98A2C7",
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  eventCard: {
-    backgroundColor: "#0B1124",
-    borderRadius: 22,
-    overflow: "hidden",
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "#18213F",
-  },
-  eventImage: {
-    height: 150,
-  },
-  eventImageStyle: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-  },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(6, 10, 22, 0.16)",
-  },
-  eventBody: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 14,
-    gap: 12,
-  },
-  eventTextWrap: {
+  navItem: {
     flex: 1,
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
-  eventTitle: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  eventMeta: {
-    color: "#D8DDF2",
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  eventLocation: {
-    color: "#95A0C6",
-    fontSize: 14,
-  },
-  liveBadge: {
-    backgroundColor: "#243A94",
+  activeIndicator: {
+    position: "absolute",
+    top: 0,
+    width: 28,
+    height: 3,
     borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: "#4D6BFF",
-  },
-  liveBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
+    backgroundColor: "#6E7BFF",
   },
 });

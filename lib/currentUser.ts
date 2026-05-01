@@ -2,17 +2,14 @@ import { supabase } from "./supabase";
 
 export async function requireCurrentUserId() {
   const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (error) {
-    throw new Error(error.message);
+  const userId = session?.user?.id ?? null;
+
+  if (!userId) {
+    throw new Error("Auth session missing!");
   }
 
-  if (!user) {
-    throw new Error("No authenticated user found.");
-  }
-
-  return user.id;
+  return userId;
 }

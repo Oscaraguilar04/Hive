@@ -1,711 +1,125 @@
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import {
-  Alert,
   ImageBackground,
   Pressable,
-  SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { requireCurrentUserId } from "../lib/currentUser";
-import { supabase } from "../lib/supabase";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-type Category =
-  | "All"
-  | "Music"
-  | "Food"
-  | "Comedy"
-  | "Nightlife"
-  | "Outdoors"
-  | "Sports";
-
-type EventItem = {
-  id: string;
-  title: string;
-  date_label: string;
-  location: string;
-  interested: number;
-  category: Exclude<Category, "All"> | string;
-  image: string;
-  featured?: boolean;
-  created_at?: string;
-  creator_id?: string | null;
-};
-
-type SavedEventRow = {
-  id: string;
-  event_id: string;
-  user_id: string;
-};
-
-type EventInterestRow = {
-  id: string;
-  event_id: string;
-  user_id: string;
-  status: "interested" | "going";
-};
-
-const CATEGORIES: Category[] = [
-  "All",
-  "Music",
-  "Food",
-  "Comedy",
-  "Nightlife",
-  "Outdoors",
-  "Sports",
-];
-
-export default function HomeScreen() {
-  const [selectedCategory, setSelectedCategory] = useState<Category>("All");
-  const [savedIds, setSavedIds] = useState<string[]>([]);
-  const [likedIds, setLikedIds] = useState<string[]>([]);
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadHomeData();
-  }, []);
-
-  const loadHomeData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([fetchEvents(), fetchSavedEvents(), fetchInterestedEvents()]);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Something went wrong loading the home feed.";
-      Alert.alert("Load error", message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchEvents = async () => {
-    const { data, error } = await supabase
-      .from("events")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    setEvents((data as EventItem[]) || []);
-  };
-
-  const fetchSavedEvents = async () => {
-    const userId = await requireCurrentUserId();
-
-    const { data, error } = await supabase
-      .from("saved_events")
-      .select("id, event_id, user_id")
-      .eq("user_id", userId);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const rows = (data as SavedEventRow[]) || [];
-    setSavedIds(rows.map((row) => row.event_id));
-  };
-
-  const fetchInterestedEvents = async () => {
-    const userId = await requireCurrentUserId();
-
-    const { data, error } = await supabase
-      .from("event_interests")
-      .select("id, event_id, user_id, status")
-      .eq("user_id", userId)
-      .eq("status", "interested");
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const rows = (data as EventInterestRow[]) || [];
-    setLikedIds(rows.map((row) => row.event_id));
-  };
-
-  const featuredEvent = events.find((event) => event.featured) ?? events[0];
-
-  const filteredEvents = useMemo(() => {
-    const nonFeatured = events.filter((event) => !event.featured);
-    if (selectedCategory === "All") return nonFeatured;
-    return nonFeatured.filter((event) => event.category === selectedCategory);
-  }, [selectedCategory, events]);
-
-  const handleNavPress = (tab: string) => {
-    if (tab === "Home") router.push("/");
-    if (tab === "Discover") router.push("/discover");
-    if (tab === "Create") router.push("/create");
-    if (tab === "Saved") router.push("/saved");
-    if (tab === "Profile") router.push("/profile");
-  };
-
-  const handleOpenEvent = (eventId: string) => {
-    router.push({
-      pathname: "/event-details",
-      params: { eventId },
-    });
-  };
-
-  const toggleSave = async (eventId: string) => {
-    try {
-      const userId = await requireCurrentUserId();
-      const isSaved = savedIds.includes(eventId);
-
-      if (isSaved) {
-        const { error } = await supabase
-          .from("saved_events")
-          .delete()
-          .eq("user_id", userId)
-          .eq("event_id", eventId);
-
-        if (error) {
-          Alert.alert("Could not unsave event", error.message);
-          return;
-        }
-
-        setSavedIds((current) => current.filter((id) => id !== eventId));
-        return;
-      }
-
-      const { error } = await supabase.from("saved_events").insert([
-        {
-          user_id: userId,
-          event_id: eventId,
-        },
-      ]);
-
-      if (error) {
-        Alert.alert("Could not save event", error.message);
-        return;
-      }
-
-      setSavedIds((current) => [...current, eventId]);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Something went wrong saving this event.";
-      Alert.alert("Save error", message);
-    }
-  };
-
-  const toggleLike = async (eventId: string) => {
-    try {
-      const userId = await requireCurrentUserId();
-      const isLiked = likedIds.includes(eventId);
-
-      if (isLiked) {
-        const { error } = await supabase
-          .from("event_interests")
-          .delete()
-          .eq("user_id", userId)
-          .eq("event_id", eventId)
-          .eq("status", "interested");
-
-        if (error) {
-          Alert.alert("Could not remove interest", error.message);
-          return;
-        }
-
-        setLikedIds((current) => current.filter((id) => id !== eventId));
-        return;
-      }
-
-      const { error } = await supabase.from("event_interests").insert([
-        {
-          user_id: userId,
-          event_id: eventId,
-          status: "interested",
-        },
-      ]);
-
-      if (error) {
-        Alert.alert("Could not mark interested", error.message);
-        return;
-      }
-
-      setLikedIds((current) => [...current, eventId]);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Something went wrong updating interest.";
-      Alert.alert("Interest error", message);
-    }
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={[styles.container, styles.centered]}>
-          <Text style={styles.loadingText}>Loading events...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!featuredEvent) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={[styles.container, styles.centered]}>
-          <Text style={styles.loadingText}>No events found.</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+export default function LandingScreen() {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
+    <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
+      <ImageBackground
+        source={require("../assets/images/index.png")}
+        style={styles.background}
+        imageStyle={styles.backgroundImage}
+        resizeMode="cover"
       >
-        <View style={styles.topBar}>
-          <Pressable onPress={() => Alert.alert("City", "City picker comes next.")}>
-            <Text style={styles.cityText}>Bakersfield ▼</Text>
-          </Pressable>
+        <View style={styles.overlay} />
 
-          <View style={styles.topBarRight}>
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => Alert.alert("Search", "Search screen comes next.")}
-            >
-              <Text style={styles.iconText}>⌕</Text>
-            </Pressable>
+        <SafeAreaView edges={["left", "right", "bottom"]} style={styles.safeContent}>
+          <View style={styles.content}>
+            <View style={styles.topSpacer} />
 
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => Alert.alert("Notifications", "Notifications later.")}
-            >
-              <Text style={styles.iconText}>🔔</Text>
-            </Pressable>
-          </View>
-        </View>
+            <View style={styles.bottomContent}>
+              <Text style={styles.headline}>Easily find & manage your own events</Text>
 
-        <Pressable onPress={() => handleOpenEvent(featuredEvent.id)}>
-          <ImageBackground
-            source={{ uri: featuredEvent.image }}
-            style={styles.heroCard}
-            imageStyle={styles.heroImage}
-          >
-            <View style={styles.heroOverlay} />
-            <View style={styles.heroContent}>
-              <Text style={styles.heroTitle}>{featuredEvent.title}</Text>
-              <Text style={styles.heroMeta}>
-                {featuredEvent.location} • {featuredEvent.date_label}
+              <Text style={styles.subtext}>
+                Discover what is happening around you, plan your nights, and bring your own
+                community together with Hive.
               </Text>
-              <Text style={styles.heroInterest}>🔥 {featuredEvent.interested} interested</Text>
 
-              <View style={styles.heroActions}>
-                <Pressable
-                  style={styles.primaryButton}
-                  onPress={() => handleOpenEvent(featuredEvent.id)}
-                >
-                  <Text style={styles.primaryButtonText}>View Event</Text>
-                </Pressable>
-
-                <Pressable
-                  style={styles.secondaryButton}
-                  onPress={() => toggleLike(featuredEvent.id)}
-                >
-                  <Text style={styles.secondaryButtonText}>
-                    {likedIds.includes(featuredEvent.id) ? "Interested ✓" : "Interested"}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          </ImageBackground>
-        </Pressable>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesRow}
-        >
-          {CATEGORIES.map((category) => {
-            const active = selectedCategory === category;
-            return (
               <Pressable
-                key={category}
-                onPress={() => setSelectedCategory(category)}
-                style={[styles.categoryPill, active && styles.categoryPillActive]}
+                style={styles.primaryButton}
+                onPress={() => router.push("/signup" as any)}
               >
-                <Text
-                  style={[styles.categoryPillText, active && styles.categoryPillTextActive]}
-                >
-                  {category}
-                </Text>
+                <Text style={styles.primaryButtonText}>Get Started</Text>
               </Pressable>
-            );
-          })}
-        </ScrollView>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>🔥 Happening Tonight</Text>
-          <Pressable onPress={loadHomeData}>
-            <Text style={styles.sectionLink}>Refresh</Text>
-          </Pressable>
-        </View>
-
-        {filteredEvents.map((event) => {
-          const isSaved = savedIds.includes(event.id);
-          const isLiked = likedIds.includes(event.id);
-
-          return (
-            <Pressable
-              key={event.id}
-              onPress={() => handleOpenEvent(event.id)}
-              style={styles.eventCard}
-            >
-              <ImageBackground
-                source={{ uri: event.image }}
-                style={styles.eventImage}
-                imageStyle={styles.eventImageStyle}
-              >
-                <View style={styles.eventImageOverlay} />
-              </ImageBackground>
-
-              <View style={styles.eventBody}>
-                <View style={styles.eventTextWrap}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventMeta}>{event.date_label}</Text>
-                  <Text style={styles.eventLocation}>{event.location}</Text>
-                  <Text style={styles.eventInterest}>🔥 {event.interested} interested</Text>
-                </View>
-
-                <View style={styles.eventActions}>
-                  <Pressable
-                    style={[styles.actionButton, isLiked && styles.actionButtonActive]}
-                    onPress={() => toggleLike(event.id)}
-                  >
-                    <Text style={styles.actionButtonText}>{isLiked ? "♥" : "♡"}</Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={[styles.actionButton, isSaved && styles.actionButtonActive]}
-                    onPress={() => toggleSave(event.id)}
-                  >
-                    <Text style={styles.actionButtonText}>{isSaved ? "🔖" : "📑"}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <View style={styles.bottomNav}>
-        <Pressable style={styles.navItem} onPress={() => handleNavPress("Home")}>
-          <Text style={[styles.navIcon, styles.navActive]}>⌂</Text>
-          <Text style={[styles.navLabel, styles.navActive]}>Home</Text>
-        </Pressable>
-
-        <Pressable style={styles.navItem} onPress={() => handleNavPress("Discover")}>
-          <Text style={styles.navIcon}>⌕</Text>
-          <Text style={styles.navLabel}>Discover</Text>
-        </Pressable>
-
-        <Pressable style={styles.createButton} onPress={() => handleNavPress("Create")}>
-          <Text style={styles.createButtonText}>＋</Text>
-        </Pressable>
-
-        <Pressable style={styles.navItem} onPress={() => handleNavPress("Saved")}>
-          <Text style={styles.navIcon}>🔖</Text>
-          <Text style={styles.navLabel}>Saved</Text>
-        </Pressable>
-
-        <Pressable style={styles.navItem} onPress={() => handleNavPress("Profile")}>
-          <Text style={styles.navIcon}>◉</Text>
-          <Text style={styles.navLabel}>Profile</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
+              <Pressable onPress={() => router.push("/login" as any)}>
+                <Text style={styles.secondaryText}>Already have an account? Log in</Text>
+              </Pressable>
+            </View>
+          </View>
+        </SafeAreaView>
+      </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#050816",
-  },
   container: {
     flex: 1,
-    backgroundColor: "#050816",
+    backgroundColor: "#000000",
   },
-  centered: {
-    justifyContent: "center",
-    alignItems: "center",
+  background: {
+    flex: 1,
+    marginTop: -6,
   },
-  loadingText: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "700",
+  backgroundImage: {
+    width: "100%",
+    height: "101%",
   },
-  contentContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 120,
-  },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 18,
-  },
-  cityText: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  topBarRight: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#10162A",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#1A2340",
-  },
-  iconText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-  },
-  heroCard: {
-    height: 270,
-    borderRadius: 26,
-    overflow: "hidden",
-    justifyContent: "flex-end",
-    marginBottom: 18,
-    backgroundColor: "#0A1020",
-  },
-  heroImage: {
-    borderRadius: 26,
-  },
-  heroOverlay: {
+  overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(5, 8, 22, 0.38)",
+    backgroundColor: "rgba(0, 0, 0, 0.73)",
   },
-  heroContent: {
-    padding: 18,
-  },
-  heroTitle: {
-    color: "#FFFFFF",
-    fontSize: 30,
-    fontWeight: "800",
-    marginBottom: 6,
-  },
-  heroMeta: {
-    color: "#D7DCF0",
-    fontSize: 16,
-    marginBottom: 6,
-  },
-  heroInterest: {
-    color: "#FFD0A8",
-    fontSize: 15,
-    marginBottom: 14,
-  },
-  heroActions: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  primaryButton: {
-    backgroundColor: "#5A6BFF",
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-  },
-  secondaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  categoriesRow: {
-    paddingBottom: 8,
-    gap: 10,
-    marginBottom: 12,
-  },
-  categoryPill: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: "#10162A",
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#1A2340",
-  },
-  categoryPillActive: {
-    backgroundColor: "#3558FF",
-    borderColor: "#3558FF",
-  },
-  categoryPillText: {
-    color: "#C9CEE0",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  categoryPillTextActive: {
-    color: "#FFFFFF",
-  },
-  sectionHeader: {
-    marginTop: 2,
-    marginBottom: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sectionTitle: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "800",
-  },
-  sectionLink: {
-    color: "#8A94C8",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  eventCard: {
-    backgroundColor: "#0B1124",
-    borderRadius: 22,
-    overflow: "hidden",
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "#18213F",
-  },
-  eventImage: {
-    height: 150,
-    backgroundColor: "#111827",
-  },
-  eventImageStyle: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-  },
-  eventImageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(8, 12, 26, 0.15)",
-  },
-  eventBody: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 14,
-    gap: 12,
-  },
-  eventTextWrap: {
+  safeContent: {
     flex: 1,
   },
-  eventTitle: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  eventMeta: {
-    color: "#D8DDF2",
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  eventLocation: {
-    color: "#9CA7CB",
-    fontSize: 14,
-    marginBottom: 6,
-  },
-  eventInterest: {
-    color: "#F3B995",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  eventActions: {
-    justifyContent: "center",
-    gap: 10,
-  },
-  actionButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
-    backgroundColor: "#141B33",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#202B4E",
-  },
-  actionButtonActive: {
-    backgroundColor: "#243A94",
-    borderColor: "#4D6BFF",
-  },
-  actionButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-  },
-  bottomNav: {
-    position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 18,
-    backgroundColor: "rgba(10, 15, 31, 0.96)",
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "#1B2444",
-    flexDirection: "row",
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 36,
     justifyContent: "space-between",
+  },
+  topSpacer: {
+    flex: 1,
+  },
+  bottomContent: {
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
   },
-  navItem: {
+  headline: {
+    color: "#FFFFFF",
+    fontSize: 38,
+    lineHeight: 44,
+    fontWeight: "800",
+    textAlign: "center",
+    textTransform: "uppercase",
+    marginBottom: 14,
+  },
+  subtext: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 28,
+    maxWidth: 310,
+  },
+  primaryButton: {
+    backgroundColor: "#f6f2f2",
+    width: "100%",
+    borderRadius: 2,
+    paddingVertical: 16,
     alignItems: "center",
-    justifyContent: "center",
-    width: 58,
+    marginBottom: 14,
   },
-  navIcon: {
-    color: "#8590B8",
-    fontSize: 18,
-    marginBottom: 2,
+  primaryButtonText: {
+    color: "#111111",
+    fontSize: 15,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
-  navLabel: {
-    color: "#8590B8",
-    fontSize: 11,
+  secondaryText: {
+    color: "#FFFFFF",
+    fontSize: 14,
     fontWeight: "600",
-  },
-  navActive: {
-    color: "#FFFFFF",
-  },
-  createButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: "#4B5DFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: -24,
-    shadowColor: "#4B5DFF",
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
-  },
-  createButtonText: {
-    color: "#FFFFFF",
-    fontSize: 28,
-    fontWeight: "700",
-    marginTop: -2,
   },
 });

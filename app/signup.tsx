@@ -12,14 +12,14 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { signInWithEmail, waitForSession } from "../lib/auth";
+import { signUpThenSignIn, waitForSession } from "../lib/auth";
 
-export default function LoginScreen() {
+export default function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const handleLogin = async () => {
+  const handleSignup = async () => {
     if (!email || !password) {
       Alert.alert("Missing info", "Please enter an email and password.");
       return;
@@ -28,7 +28,7 @@ export default function LoginScreen() {
     setSubmitting(true);
 
     try {
-      const result = await signInWithEmail(email.trim(), password);
+      const result = await signUpThenSignIn(email.trim(), password);
 
       if (result.error) {
         Alert.alert("Auth error", result.error.message);
@@ -38,14 +38,14 @@ export default function LoginScreen() {
       const session = await waitForSession();
 
       if (!session) {
-        Alert.alert("Session error", "Login worked, but the session was not ready yet.");
+        Alert.alert("Session error", "Account was created, but the session was not ready yet.");
         return;
       }
 
       router.replace("/home" as any);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Something went wrong during login.";
+        error instanceof Error ? error.message : "Something went wrong during signup.";
       Alert.alert("Auth error", message);
     } finally {
       setSubmitting(false);
@@ -80,9 +80,9 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <Text style={styles.title}>Log In to Hive</Text>
+            <Text style={styles.title}>Sign Up to Hive</Text>
             <Text style={styles.subtitle}>
-              Welcome back. Sign in to keep discovering events.
+              Create your account and start discovering events
             </Text>
 
             <Pressable style={styles.socialButton}>
@@ -137,20 +137,16 @@ export default function LoginScreen() {
 
             <Pressable
               style={[styles.primaryButton, submitting && styles.disabled]}
-              onPress={handleLogin}
+              onPress={handleSignup}
               disabled={submitting}
             >
               <Text style={styles.primaryButtonText}>
-                {submitting ? "Please wait..." : "Log In"}
+                {submitting ? "Please wait..." : "Create Account"}
               </Text>
             </Pressable>
 
-            <Pressable>
-              <Text style={styles.smallText}>Forgot your password?</Text>
-            </Pressable>
-
-            <Pressable onPress={() => router.push("/signup" as any)}>
-              <Text style={styles.footerText}>Need an account? Sign up</Text>
+            <Pressable onPress={() => router.push("/login" as any)}>
+              <Text style={styles.footerText}>Already have an account? Log in</Text>
             </Pressable>
           </View>
         </SafeAreaView>
@@ -175,7 +171,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   safeContent: {
     flex: 1,
@@ -253,7 +249,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.72)",
+    backgroundColor: "rgba(255,255,255,0.20)",
     marginVertical: 18,
   },
   label: {
@@ -281,7 +277,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   disabled: {
     opacity: 0.7,
@@ -290,14 +286,6 @@ const styles = StyleSheet.create({
     color: "#111111",
     fontSize: 14,
     fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  smallText: {
-    color: "#E0E0E4",
-    fontSize: 12,
-    textAlign: "center",
-    fontWeight: "600",
-    marginBottom: 16,
     textTransform: "uppercase",
   },
   footerText: {
