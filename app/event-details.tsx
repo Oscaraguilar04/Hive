@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   ImageBackground,
@@ -39,29 +39,7 @@ export default function EventDetailsScreen() {
   const [going, setGoing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!eventId) {
-      setLoading(false);
-      return;
-    }
-
-    loadEventData();
-  }, [eventId]);
-
-  const loadEventData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([fetchEvent(), loadEventState()]);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Something went wrong loading this event.";
-      Alert.alert("Event error", message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchEvent = async () => {
+  const fetchEvent = useCallback(async () => {
     const { data, error } = await supabase
       .from("events")
       .select("*")
@@ -73,9 +51,9 @@ export default function EventDetailsScreen() {
     }
 
     setEvent(data as EventItem);
-  };
+  }, [eventId]);
 
-  const loadEventState = async () => {
+  const loadEventState = useCallback(async () => {
     const userId = await requireCurrentUserId();
 
     const { data: savedData, error: savedError } = await supabase
@@ -103,7 +81,29 @@ export default function EventDetailsScreen() {
     const statuses = ((interestData as InterestRow[]) || []).map((row) => row.status);
     setInterested(statuses.includes("interested"));
     setGoing(statuses.includes("going"));
-  };
+  }, [eventId]);
+
+  const loadEventData = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([fetchEvent(), loadEventState()]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong loading this event.";
+      Alert.alert("Event error", message);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchEvent, loadEventState]);
+
+  useEffect(() => {
+    if (!eventId) {
+      setLoading(false);
+      return;
+    }
+
+    loadEventData();
+  }, [eventId, loadEventData]);
 
   const toggleSave = async () => {
     if (!eventId) return;
