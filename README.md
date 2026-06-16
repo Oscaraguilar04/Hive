@@ -45,13 +45,32 @@ correctly. Do not commit `.env` or service-role keys.
 npm run start
 ```
 
+`npm run start` uses Expo tunnel mode so the QR code works when your phone is not on the
+same network as the development machine, including cloud dev environments.
+
 Useful variants:
 
 ```sh
+npm run start:lan
+npm run start:localhost
+npm run start:clear
 npm run ios
 npm run android
 npm run web
 ```
+
+### QR code troubleshooting
+
+If scanning the Expo QR code does not open the app:
+
+1. Make sure you are using the current Expo Go app for SDK 54.
+2. Run `npm run start:clear` and scan the new tunnel QR code.
+3. If you are developing locally and your phone is on the same Wi-Fi, `npm run start:lan`
+   is also fine. Cloud development should use `npm run start`.
+4. If the app opens to a red error screen, confirm `.env` exists and has valid
+   `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` values.
+5. If the QR scanner still does nothing, open Expo Go manually and paste the URL printed by
+   Expo in the terminal.
 
 ## Quality checks
 
