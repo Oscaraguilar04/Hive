@@ -31,6 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files
+# Keep real Supabase values out of git. Expo client-side env vars must still be
+# named EXPO_PUBLIC_* in your local .env file.
 .env
 .env.*
 !.env.example

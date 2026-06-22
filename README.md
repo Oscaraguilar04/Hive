@@ -45,13 +45,49 @@ correctly. Do not commit `.env` or service-role keys.
 npm run start
 ```
 
+`npm run start` uses Expo tunnel mode so the QR code works when your phone is not on the
+same network as the development machine, including cloud dev environments.
+
 Useful variants:
 
 ```sh
+npm run start:lan
+npm run start:localhost
+npm run start:clear
 npm run ios
 npm run android
 npm run web
 ```
+
+### QR code and install troubleshooting
+
+If Expo reports packages like `expo-router@56.x`, `react@19.2.x`, or
+`react-native@0.85.x`, your local install has drifted past this app's Expo SDK 54 versions.
+Reset the local install from the checked-in lockfile.
+
+PowerShell:
+
+```powershell
+Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+git restore package-lock.json
+npm install
+npm run start:clear
+```
+
+If you deleted `package-lock.json` and cannot restore it, pull the latest branch from git
+first, then run `npm install` again. The package file pins Expo Router's optional
+`react-server-dom-webpack` peer so npm does not resolve it to a React 19.2-only version.
+
+If scanning the Expo QR code does not open the app:
+
+1. Make sure you are using the current Expo Go app for SDK 54.
+2. Run `npm run start:clear` and scan the new tunnel QR code.
+3. If you are developing locally and your phone is on the same Wi-Fi, `npm run start:lan`
+   is also fine. Cloud development should use `npm run start`.
+4. If the app opens to a red error screen, confirm `.env` exists and has valid
+   `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` values.
+5. If the QR scanner still does nothing, open Expo Go manually and paste the URL printed by
+   Expo in the terminal.
 
 ## Quality checks
 
