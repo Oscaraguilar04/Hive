@@ -4,7 +4,6 @@ import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
     Alert,
-    Dimensions,
     Image,
     Modal,
     Pressable,
@@ -17,8 +16,6 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import UserAvatar from "../components/UserAvatar";
 import { supabase } from "../lib/supabase";
-
-const { width } = Dimensions.get("window");
 
 const DEFAULT_REGION: Region = {
   latitude: 35.3733,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ImageBackground,
   Pressable,
@@ -40,28 +40,13 @@ export default function SavedScreen() {
   const [savedEvents, setSavedEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadSavedScreenData();
-  }, []);
-
-  const normalizeEvent = (value: EventRow | EventRow[] | null): EventRow | null => {
+  const normalizeEvent = useCallback((value: EventRow | EventRow[] | null): EventRow | null => {
     if (!value) return null;
     if (Array.isArray(value)) return value[0] ?? null;
     return value;
-  };
+  }, []);
 
-  const loadSavedScreenData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([fetchGoingEvents(), fetchSavedEvents()]);
-    } catch (error) {
-      console.error("Error loading saved screen data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchGoingEvents = async () => {
+  const fetchGoingEvents = useCallback(async () => {
     const userId = await requireCurrentUserId();
 
     const { data, error } = await supabase
@@ -93,9 +78,9 @@ export default function SavedScreen() {
       .filter((event): event is EventRow => Boolean(event));
 
     setGoingEvents(normalized);
-  };
+  }, [normalizeEvent]);
 
-  const fetchSavedEvents = async () => {
+  const fetchSavedEvents = useCallback(async () => {
     const userId = await requireCurrentUserId();
 
     const { data, error } = await supabase
@@ -125,7 +110,22 @@ export default function SavedScreen() {
       .filter((event): event is EventRow => Boolean(event));
 
     setSavedEvents(normalized);
-  };
+  }, [normalizeEvent]);
+
+  const loadSavedScreenData = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([fetchGoingEvents(), fetchSavedEvents()]);
+    } catch (error) {
+      console.error("Error loading saved screen data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchGoingEvents, fetchSavedEvents]);
+
+  useEffect(() => {
+    loadSavedScreenData();
+  }, [loadSavedScreenData]);
 
   const currentList = activeTab === "Going" ? goingEvents : savedEvents;
 
